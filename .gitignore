@@ -1,19 +1,28 @@
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
 
-# Runtime files
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Environment files
+.env
+
+# Runtime data
 state.json
-
-# Logs
-logs/
 
 # Local configuration
 config.py
 
-# Virtual environment
-.venv/
-venv/
+# Logs
+logs/
 
-# Environment variables
-.env
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
