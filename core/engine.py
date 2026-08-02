@@ -147,6 +147,7 @@ def run_engine():
                     sl = state["high"] * 1.001
 
                 tp = calculate_extension_price(
+
                     side=side,
                     high=state["high"],
                     low=state["low"],
