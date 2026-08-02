@@ -14,6 +14,7 @@ print("ENGINE STATE ID:", id(state))
 from data.candles import get_candle
 from strategy.zones import get_zones
 from strategy.signals import get_signal
+from strategy.fibo import calculate_extension_price
 
 from execution.risk import calculate_position_size
 from execution.pnl import calculate_pnl
@@ -142,10 +143,15 @@ def run_engine():
                 # =========================
                 if side == "long":
                     sl = state["low"] * 0.999
-                    tp = state["high"]
                 else:
                     sl = state["high"] * 1.001
-                    tp = state["low"]
+
+                tp = calculate_extension_price(
+                    side=side,
+                    high=state["high"],
+                    low=state["low"],
+                    level=state["tp_level"]
+)
 
                 # =========================
                 # POSITION SIZE

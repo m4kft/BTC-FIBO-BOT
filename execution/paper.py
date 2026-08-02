@@ -45,6 +45,23 @@ def open_trade(side, entry, sl, tp, pos_btc, pos_usd, zone):
         return
 
     # =========================
+    # TP TARGETS
+    # =========================
+
+    state["tp_targets"] = [
+        {
+            "level": 1.0,
+            "price": tp,
+            "percent": 100,
+            "hit": False
+        }
+    ]
+
+    state["remaining_percent"] = 100.0
+    state["breakeven_active"] = False
+
+
+    # =========================
     # ZONE LOCK
     # =========================
     if side == "long":

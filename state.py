@@ -38,6 +38,9 @@ state = {
     "sl": 0.0,
     "tp": 0.0,
 
+    # TP SETTINGS
+    "tp_level": 1.0,
+
     "entry_time": None,
     "entry_timeframe": None,
     "active_tf": None,
@@ -46,19 +49,25 @@ state = {
     "pos_usd": 0.0,
 
     # =========================
-    # V4 POSITION MANAGEMENT
+    # V4 TRADE MANAGEMENT
     # =========================
 
-    # Aktív TP konfiguráció
-    "tp_targets": [
+    # Felhasználói TP beállítások
+    # Ezeket Telegramból lehet majd módosítani.
+    "tp_config": [
         {
-            "level": "high",
-            "percent": 100,
-            "hit": False
+            "type": "fibo",
+            "value": 1.0,
+            "percent": 100
         }
     ],
 
-    # Mennyi pozíció maradt (%)
+    # Az AKTUÁLIS trade célárai.
+    # Trade nyitásakor a bot automatikusan felépíti
+    # a tp_config alapján.
+    "active_targets": [],
+
+    # Mennyi pozíció maradt nyitva
     "remaining_percent": 100.0,
 
     # Break Even
