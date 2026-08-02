@@ -45,6 +45,26 @@ state = {
     "pos_btc": 0.0,
     "pos_usd": 0.0,
 
+    # =========================
+    # V4 POSITION MANAGEMENT
+    # =========================
+
+    # Aktív TP konfiguráció
+    "tp_targets": [
+        {
+            "level": "high",
+            "percent": 100,
+            "hit": False
+        }
+    ],
+
+    # Mennyi pozíció maradt (%)
+    "remaining_percent": 100.0,
+
+    # Break Even
+    "breakeven_enabled": False,
+    "breakeven_active": False,
+
     # STATS
     "wins": 0,
     "losses": 0,
