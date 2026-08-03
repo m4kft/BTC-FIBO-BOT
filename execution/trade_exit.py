@@ -1,7 +1,7 @@
 from state import state, save_state
 from execution.pnl import calculate_pnl
 from execution.paper import close_trade
-from telegram.bot import send_close
+from telegram.bot import send_close, send_tp_hit
 
 
 def check_trade_exit(candle):
@@ -126,6 +126,10 @@ def check_trade_exit(candle):
 
         tp_hit["hit"] = True
 
+        tp_number = (
+            state["active_targets"].index(tp_hit) + 1
+        )
+
         # Ne menjen negatívba lebegőpontos hiba miatt
         if state["remaining_percent"] < 0:
             state["remaining_percent"] = 0
@@ -134,6 +138,7 @@ def check_trade_exit(candle):
             f"🎯 TP HIT {tp_hit['value']} | "
             f"{tp_hit['percent']}% CLOSED"
         )
+
 
         # =========================
         # BREAK EVEN
@@ -149,6 +154,20 @@ def check_trade_exit(candle):
             state["breakeven_active"] = True
 
             print("🟢 BREAK EVEN ACTIVATED")
+
+        send_tp_hit(
+
+            tp_number,
+
+            tp_hit,
+
+            state["remaining_percent"],
+
+            state["trade_pnl"],
+
+            state["breakeven_active"]
+
+        )
 
         # Ha ez volt az utolsó TP,
         # a maradék pozíció már 0.
