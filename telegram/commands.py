@@ -15,44 +15,74 @@ def handle_command(text: str):
     if text == "/help":
 
         return """
-🤖 FIBO BOT COMMANDS
+🤖 BTC FIBO BOT V4
 
-▶ BOT
+══════════ BOT ══════════
+
 /start
 /stop
 /status
 
-▶ SYMBOL
+════════ SYMBOL ════════
+
 /btc
 /eth
 /sol
 /xrp
 /symbol BTCUSDT
 
-▶ DIRECTION
+═══════ DIRECTION ═══════
+
 /long
 /short
 /both
 
-▶ TIMEFRAME
-/tf 1m
-/tf 1m 5m
-/tf 1m 5m 15m
-/tf 5m 15m 1h
+═══════ TIMEFRAME ═══════
 
-▶ RANGE
+/tf 1m
+/tf 5m
+/tf 15m
+/tf 1h
+
+/tf 1m 5m
+/tf 5m 15m
+/tf 15m 1h
+
+════════ RANGE ═════════
+
 /range HIGH LOW
 
 Example:
 /range 60961 58205
 
-▶ RISK
+═════════ RISK ═════════
+
 /risk 1
 
-▶ INFO
+══════ TAKE PROFIT ══════
+
+/tp
+/tp clear
+/tp reset
+/tp add <fibo> <percent>
+/tp remove <index>
+
+Examples:
+/tp add 1.0 30
+/tp add 1.272 30
+/tp add 1.618 40
+
+════════ BREAK EVEN ════════
+
+/be on
+/be off
+
+═════════ INFO ═════════
+
 /zones
 
-▶ RESET
+════════ RESET ═════════
+
 /reset
 """
 
@@ -280,33 +310,211 @@ Example:
 
         return msg
 
+    # =====================================================
+    # TP CONFIG
+    # =====================================================
+    if text == "/tp":
+
+        if len(state["tp_config"]) == 0:
+            return "⚠ No TP configured."
+
+        msg = "📌 TP CONFIGURATION\n\n"
+
+        total = 0
+
+        for i, tp in enumerate(state["tp_config"], start=1):
+
+            msg += (
+                f"{i}. "
+                f"Fibo {tp['value']} "
+                f"→ {tp['percent']}%\n"
+            )
+
+            total += tp["percent"]
+
+        msg += f"\nTotal: {total}%"
+
+        return msg
+
+    # =====================================================
+    # TP CLEAR
+    # =====================================================
+    if text == "/tp clear":
+
+        state["tp_config"] = []
+
+        save_state(state)
+
+        return "🗑 TP configuration cleared."
+
+    # =====================================================
+    # TP RESET
+    # =====================================================
+    if text == "/tp reset":
+
+        state["tp_config"] = [
+            {
+                "type": "fibo",
+                "value": 1.0,
+                "percent": 100
+            }
+        ]
+
+        save_state(state)
+
+        return "♻ TP configuration reset."
+
+    # =====================================================
+    # TP ADD
+    # =====================================================
+    if text.startswith("/tp add"):
+
+        try:
+
+            _, _, level, percent = text.split()
+
+            level = float(level)
+            percent = float(percent)
+
+            if level < 1.0:
+                return "❌ Fibonacci level must be >= 1.0"
+
+            if percent <= 0:
+                return "❌ Percent must be greater than 0"
+
+            total = sum(tp["percent"] for tp in state["tp_config"])
+
+            if total + percent > 100:
+                return "❌ Total TP percentage cannot exceed 100%"
+
+            state["tp_config"].append(
+                {
+                    "type": "fibo",
+                    "value": level,
+                    "percent": percent
+                }
+            )
+
+            save_state(state)
+
+            return (
+                f"✅ TP added\n\n"
+                f"Level: {level}\n"
+                f"Percent: {percent}%"
+            )
+
+        except:
+            return "Usage:\n/tp add 1.618 50"
+
+    # =====================================================
+    # TP REMOVE
+    # =====================================================
+    if text.startswith("/tp remove"):
+
+        try:
+
+            _, _, index = text.split()
+
+            index = int(index) - 1
+
+            if index < 0 or index >= len(state["tp_config"]):
+                return "❌ Invalid TP index"
+
+            removed = state["tp_config"].pop(index)
+
+            save_state(state)
+
+            return (
+                f"🗑 TP removed\n\n"
+                f"Level: {removed['value']}\n"
+                f"Percent: {removed['percent']}%"
+            )
+
+        except:
+            return "Usage:\n/tp remove 2"
+
+    # =====================================================
+    # BREAK EVEN ON
+    # =====================================================
+    if text == "/be on":
+
+        state["breakeven_enabled"] = True
+
+        save_state(state)
+
+        return "🟢 Break Even enabled"
+
+    # =====================================================
+    # BREAK EVEN OFF
+    # =====================================================
+    if text == "/be off":
+
+        state["breakeven_enabled"] = False
+
+        save_state(state)
+
+        return "🔴 Break Even disabled"
 
     # =====================================================
     # STATUS
     # =====================================================
     if text == "/status":
 
+        tp_text = ""
+
+        if len(state["tp_config"]) == 0:
+
+            tp_text = "None"
+
+        else:
+
+            for i, tp in enumerate(state["tp_config"], start=1):
+
+                tp_text += (
+                    f"{i}. Fibo {tp['value']} → "
+                    f"{tp['percent']}%\n"
+                )
+
         return f"""
-📊 STATUS
+📊 BTC FIBO BOT STATUS
+
+════════ BOT ════════
 
 Running: {state["running"]}
+
+════════ MARKET ════════
+
 Symbol: {state["symbol"]}
 Direction: {state["direction"]}
 Timeframes: {state["timeframes"]}
 
-Range:
+════════ RANGE ════════
+
 High: {state["high"]}
 Low : {state["low"]}
 
-Risk: {state["risk"]}
+════════ RISK ════════
 
-Trade Active: {state["trade_active"]}
+Risk: {state["risk"]}%
+
+════════ TRADE ════════
+
+Active: {state["trade_active"]}
 Side: {state["trade_side"]}
 
-Balance: {state["balance"]}
+════════ TAKE PROFIT ════════
+
+{tp_text}
+
+Break Even: {"ON" if state["breakeven_enabled"] else "OFF"}
+
+════════ ACCOUNT ════════
+
+Balance: {round(state["balance"],2)}
+
 Wins: {state["wins"]}
 Losses: {state["losses"]}
-Total: {state["total_trades"]}
+Trades: {state["total_trades"]}
 """
 
 

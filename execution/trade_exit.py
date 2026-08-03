@@ -92,8 +92,15 @@ def check_trade_exit(candle):
 
         close_percent = tp_hit["percent"] / 100.0
 
-        close_btc = state["pos_btc"] * close_percent
-        close_usd = state["pos_usd"] * close_percent
+        close_btc = (
+            state["initial_pos_btc"]
+            * close_percent
+        )
+
+        close_usd = (
+            state["initial_pos_usd"]
+            * close_percent
+        )
 
         pnl = calculate_pnl(
             entry,
@@ -103,9 +110,17 @@ def check_trade_exit(candle):
         )
 
         state["balance"] += pnl
+        state["trade_pnl"] += pnl
 
         state["pos_btc"] -= close_btc
         state["pos_usd"] -= close_usd
+
+        # Lebegőpontos védelem
+        if state["pos_btc"] < 0:
+            state["pos_btc"] = 0
+
+        if state["pos_usd"] < 0:
+            state["pos_usd"] = 0
 
         state["remaining_percent"] -= tp_hit["percent"]
 
@@ -138,9 +153,7 @@ def check_trade_exit(candle):
         # Ha ez volt az utolsó TP,
         # a maradék pozíció már 0.
         if state["remaining_percent"] <= 0:
-
-            state["pos_btc"] = 0
-            state["pos_usd"] = 0
+            pass
 
         # Ha ez nem az utolsó TP, akkor marad nyitva a trade
         if state["remaining_percent"] > 0:
@@ -151,9 +164,19 @@ def check_trade_exit(candle):
 
             save_state(state)
 
+        else:
+
+            # Az utolsó TP után is mentsük el az állapotot,
+            # mielőtt a végleges lezárás lefut.
+            save_state(state)
+
+        if state["remaining_percent"] > 0:
+
             print(
                 f"📦 Remaining position: {state['remaining_percent']}%"
             )
+
+            print("⏳ Trade remains active.")
 
             return False
             
@@ -163,7 +186,7 @@ def check_trade_exit(candle):
 
     pnl = 0
 
-    if result == "LOSS":
+    if result in ("LOSS", "BE"):
 
         pnl = calculate_pnl(
             entry,
@@ -173,12 +196,19 @@ def check_trade_exit(candle):
         )
 
         state["balance"] += pnl
+        state["trade_pnl"] += pnl
+
+    elif result == "WIN" and state["remaining_percent"] <= 0:
+
+         # Az utolsó TP PnL-je már a PARTIAL TP
+         # blokkban elszámolásra került.
+         pnl = 0
 
     # =========================
     # STATS
     # =========================
 
-    if result == "WIN":
+    if result == "WIN" and tp_hit is not None:
 
         state["wins"] += (
             tp_hit["percent"] / 100.0
@@ -186,9 +216,9 @@ def check_trade_exit(candle):
 
     elif result == "LOSS":
 
-        state["losses"] += (
-            state["remaining_percent"] / 100.0
-        )
+        loss_part = state["remaining_percent"] / 100.0
+
+        state["losses"] += loss_part
 
     elif result == "BE":
 
@@ -202,7 +232,11 @@ def check_trade_exit(candle):
 
         state["total_trades"] += 1
 
-        send_close(result, pnl, state.get("active_tf"))
+        send_close(
+            result,
+            state["trade_pnl"],
+            state.get("active_tf")
+        )
 
         print(f"📉 TRADE CLOSED | {result}")
 
@@ -215,7 +249,11 @@ def check_trade_exit(candle):
         state["tp"] = 0
         state["pos_btc"] = 0
         state["pos_usd"] = 0
+        state["initial_pos_btc"] = 0
+        state["initial_pos_usd"] = 0
         state["remaining_percent"] = 0
+        state["trade_pnl"] = 0.0
+        state["breakeven_active"] = False
         state["entry_time"] = None
         state["entry_candle_close"] = None
 

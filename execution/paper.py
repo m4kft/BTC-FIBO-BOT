@@ -22,6 +22,11 @@ def open_trade(side, entry, sl, tp, pos_btc, pos_usd, zone):
         state["pos_btc"] = pos_btc
         state["pos_usd"] = pos_usd
 
+        state["initial_pos_btc"] = pos_btc
+        state["initial_pos_usd"] = pos_usd
+
+        state["trade_pnl"] = 0.0
+
     # =========================
     # ÚJ BELÉPŐ (SCALE IN)
     # =========================

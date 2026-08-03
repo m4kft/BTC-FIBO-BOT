@@ -48,6 +48,10 @@ state = {
     "pos_btc": 0.0,
     "pos_usd": 0.0,
 
+    # Eredeti pozíció mérete
+    "initial_pos_btc": 0.0,
+    "initial_pos_usd": 0.0,
+
     # =========================
     # V4 TRADE MANAGEMENT
     # =========================
@@ -73,6 +77,9 @@ state = {
     # Break Even
     "breakeven_enabled": False,
     "breakeven_active": False,
+
+    # Aktuális trade összesített PnL-je
+    "trade_pnl": 0.0,
 
     # STATS
     "wins": 0.0,
