@@ -84,8 +84,9 @@ def run_engine():
                     state["structure_active"]
                     and not state["range_invalid"]
                     and (
-                        live["high"] > state["high"]
-                        or live["low"] < state["low"]
+                        live["high"] >= state["high"]
+                        or
+                        live["low"] <= state["low"]
                     )
                 ):
 
