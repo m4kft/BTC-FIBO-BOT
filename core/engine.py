@@ -74,7 +74,7 @@ def run_engine():
 
                 # Mindig ellenőrizzük az exitet
                 if state["trade_active"]:
-                    check_trade_exit(candle)
+                    check_trade_exit(live)
 
                 # =========================
                 # RANGE INVALID CHECK

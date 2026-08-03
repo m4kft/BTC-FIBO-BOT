@@ -75,8 +75,8 @@ state = {
     "breakeven_active": False,
 
     # STATS
-    "wins": 0,
-    "losses": 0,
+    "wins": 0.0,
+    "losses": 0.0,
     "total_trades": 0,
 
     # SIGNAL

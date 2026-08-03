@@ -1,5 +1,7 @@
 from state import state, save_state
 import time
+from strategy.fibo import calculate_extension_price
+
 
 def open_trade(side, entry, sl, tp, pos_btc, pos_usd, zone):
 
@@ -48,14 +50,33 @@ def open_trade(side, entry, sl, tp, pos_btc, pos_usd, zone):
     # TP TARGETS
     # =========================
 
-    state["tp_targets"] = [
-        {
-            "level": 1.0,
-            "price": tp,
-            "percent": 100,
-            "hit": False
-        }
-    ]
+    
+
+    state["active_targets"] = []
+
+    for tp in state["tp_config"]:
+
+        if tp["type"] == "fibo":
+
+            price = calculate_extension_price(
+                side,
+                state["high"],
+                state["low"],
+                tp["value"]
+            )
+
+        else:
+            continue
+
+        state["active_targets"].append(
+            {
+                "type": tp["type"],
+                "value": tp["value"],
+                "price": price,
+                "percent": tp["percent"],
+                "hit": False
+            }
+        )
 
     state["remaining_percent"] = 100.0
     state["breakeven_active"] = False
