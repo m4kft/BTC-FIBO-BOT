@@ -76,6 +76,11 @@ def run_engine():
                 if state["trade_active"]:
                     check_trade_exit(live)
 
+                # Ha a trade még mindig aktív,
+                # nem keresünk új belépőt.
+                if state["trade_active"]:
+                    continue
+
                 # =========================
                 # RANGE INVALID CHECK
                 # =========================

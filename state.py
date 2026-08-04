@@ -116,16 +116,20 @@ state = {
 # LOAD STATE
 # =========================
 def load_state():
+
     if not os.path.exists(STATE_FILE):
-        return {}
+
+        save_state(state)
+
+        return state.copy()
 
     try:
         with open(STATE_FILE, "r") as f:
             data = json.load(f)
             return data if isinstance(data, dict) else {}
+
     except:
         return {}
-
 
 # =========================
 # SAVE STATE (SAFE)
