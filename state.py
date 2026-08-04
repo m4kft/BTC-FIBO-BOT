@@ -155,3 +155,98 @@ def save_state(state_data):
         except Exception as e:
             print("SAVE ERROR:", e)
             return
+
+
+# =========================
+# RESET TRADE
+# =========================
+def reset_trade_state():
+
+    # MARKET
+    state["symbol"] = CONFIG["default_symbol"]
+    state["direction"] = CONFIG["default_direction"]
+    state["timeframes"] = CONFIG["default_timeframes"].copy()
+
+    # RANGE
+    state["high"] = None
+    state["low"] = None
+    state["range_set_time"] = 0
+    state["structure_active"] = False
+    state["range_invalid"] = False
+
+    # TRADE
+    state["trade_active"] = False
+    state["trade_side"] = None
+
+    state["entry"] = 0.0
+    state["sl"] = 0.0
+    state["tp"] = 0.0
+
+    state["entry_time"] = None
+    state["entry_timeframe"] = None
+    state["active_tf"] = None
+
+    state["pos_btc"] = 0.0
+    state["pos_usd"] = 0.0
+
+    state["initial_pos_btc"] = 0.0
+    state["initial_pos_usd"] = 0.0
+
+    # TAKE PROFIT
+    state["tp_level"] = 1.0
+
+    state["tp_config"] = [
+        {
+            "type": "fibo",
+            "value": 1.0,
+            "percent": 100
+        }
+    ]
+
+    state["active_targets"] = []
+    state["remaining_percent"] = 100.0
+
+    # BREAK EVEN
+    state["breakeven_enabled"] = False
+    state["breakeven_active"] = False
+
+    # SIGNAL
+    state["last_signal"] = None
+    state["last_signal_tf"] = None
+
+    # CANDLES
+    state["last_candle_ts"] = {
+        "1m": None,
+        "5m": None,
+        "15m": None,
+        "1h": None
+    }
+
+    # ZONE LOCK
+    state["long_zone_used"] = {
+        "A": False,
+        "B": False,
+        "C": False
+    }
+
+    state["short_zone_used"] = {
+        "A": False,
+        "B": False,
+        "C": False
+    }
+
+# =========================
+# FACTORY RESET
+# =========================
+def factory_reset_state():
+
+    reset_trade_state()
+
+    state["balance"] = CONFIG["paper_balance"]
+    state["risk"] = 1.0
+
+    state["wins"] = 0.0
+    state["losses"] = 0.0
+    state["total_trades"] = 0
+
+    state["trade_pnl"] = 0.0

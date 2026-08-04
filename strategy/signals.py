@@ -31,7 +31,7 @@ def get_active_short_zone(close_price, zones):
 # =========================
 def get_long_signal(candle, prev_candle, zones, state):
 
-    if state["direction"] not in ["long", "both"]:
+    if state["direction"] != "long":
         return None
 
     o, h, l, c = candle["open"], candle["high"], candle["low"], candle["close"]
@@ -75,7 +75,7 @@ def get_long_signal(candle, prev_candle, zones, state):
 # =========================
 def get_short_signal(candle, prev_candle, zones, state):
 
-    if state["direction"] not in ["short", "both"]:
+    if state["direction"] != "short":
         return None
 
     o, h, l, c = candle["open"], candle["high"], candle["low"], candle["close"]

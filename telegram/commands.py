@@ -1,4 +1,9 @@
-from state import state, save_state
+from state import (
+    state,
+    save_state,
+    reset_trade_state,
+    factory_reset_state
+)
 from strategy.zones import get_zones
 
 import time
@@ -35,7 +40,6 @@ def handle_command(text: str):
 
 /long
 /short
-/both
 
 ═══════ TIMEFRAME ═══════
 
@@ -83,7 +87,8 @@ Examples:
 
 ════════ RESET ═════════
 
-/reset
+/reset_trade
+/factory_reset
 """
 
     # =====================================================
@@ -174,18 +179,8 @@ Examples:
 
         return "🔴 Direction: SHORT"
 
+   
     # =====================================================
-    # BOTH
-    # =====================================================
-    if text == "/both":
-
-        state["direction"] = "both"
-
-        save_state(state)
-
-        return "🟡 Direction: BOTH"
-
-           # =====================================================
     # TIMEFRAME
     # =====================================================
     if text.startswith("/tf"):
@@ -275,18 +270,28 @@ Examples:
             return "Usage: /risk 1"
 
 
-    # =====================================================
-    # RESET ZONES
-    # =====================================================
-    if text == "/reset":
 
-        state["long_zone_used"] = {"A": False, "B": False, "C": False}
-        state["short_zone_used"] = {"A": False, "B": False, "C": False}
+    # =====================================================
+    # RESET TRADE
+    # =====================================================
+    if text == "/reset_trade":
+
+        reset_trade_state()
 
         save_state(state)
 
-        return "♻ Zones reset"
+        return "✅ Trade reset completed."
 
+    # =====================================================
+    # FACTORY RESET
+    # =====================================================
+    if text == "/factory_reset":
+
+        factory_reset_state()
+
+        save_state(state)
+
+        return "✅ Factory reset completed."
 
     # =====================================================
     # ZONES DISPLAY
