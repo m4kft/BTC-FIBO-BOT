@@ -4,31 +4,125 @@ import os
 
 STATE_FILE = "state.json"
 
+# =========================
+# SYMBOL TEMPLATE
+# =========================
+def create_symbol_state():
+
+    return {
+
+        # MARKET
+        "symbol": CONFIG["default_symbol"],
+        "direction": CONFIG["default_direction"],
+        "timeframes": CONFIG["default_timeframes"].copy(),
+
+        # RANGE
+        "high": None,
+        "low": None,
+
+        "price_precision": 2,
+
+        "range_set_time": 0,
+
+        "structure_active": False,
+        "range_invalid": False,
+
+        # TRADE
+        "trade_active": False,
+        "trade_side": None,
+
+        "entry": 0.0,
+        "sl": 0.0,
+        "tp": 0.0,
+
+        "entry_time": None,
+        "entry_timeframe": None,
+        "active_tf": None,
+
+        "pos_btc": 0.0,
+        "pos_usd": 0.0,
+
+        "initial_pos_btc": 0.0,
+        "initial_pos_usd": 0.0,
+
+        # TP
+        "tp_level": 1.0,
+
+        "tp_config": [
+            {
+                "type": "fibo",
+                "value": 1.0,
+                "percent": 100
+            }
+        ],
+
+        "active_targets": [],
+        "remaining_percent": 100.0,
+
+        # BREAK EVEN
+        "breakeven_enabled": False,
+        "breakeven_active": False,
+
+        "trade_pnl": 0.0,
+
+        # SIGNAL
+        "last_signal": None,
+        "last_signal_tf": None,
+
+        # CANDLES
+        "last_candle_ts": {
+            "1m": None,
+            "5m": None,
+            "15m": None,
+            "1h": None
+        },
+
+        # ZONE LOCK
+        "long_zone_used": {
+            "A": False,
+            "B": False,
+            "C": False
+        },
+
+        "short_zone_used": {
+            "A": False,
+            "B": False,
+            "C": False
+        }
+
+    }
 
 # =========================
 # CORE STATE
 # =========================
 state = {
+
+    # =========================
     # BOT CONTROL
+    # =========================
     "running": True,
 
-    # MARKET / SETUP
-    "symbol": CONFIG["default_symbol"],
-    "direction": CONFIG["default_direction"],
-    "timeframes": CONFIG["default_timeframes"].copy(),
-
-    # USER RANGE (FIBO)
-    "high": None,
-    "low": None,
-
-    "range_set_time": 0,
-
-    "structure_active": False,
-    "range_invalid": False,
-
-    # ACCOUNT / RISK
+    # =========================
+    # GLOBAL ACCOUNT
+    # =========================
     "balance": CONFIG["paper_balance"],
     "risk": 1.0,
+
+    "wins": 0.0,
+    "losses": 0.0,
+    "total_trades": 0,
+
+    # =========================
+    # ACTIVE SYMBOL
+    # =========================
+    "active_symbol": CONFIG["default_symbol"],
+
+    # =========================
+    # SYMBOLS
+    # =========================
+    "symbols": {
+        CONFIG["default_symbol"]: create_symbol_state()
+    },
 
     # TRADE STATE
     "trade_active": False,
@@ -162,6 +256,36 @@ def save_state(state_data):
 # =========================
 def reset_trade_state():
 
+    # =========================
+    # V5 MULTI SYMBOL RESET
+    # =========================
+
+    for symbol_state in state["symbols"].values():
+
+        symbol_state["trade_active"] = False
+        symbol_state["trade_side"] = None
+
+        symbol_state["entry"] = 0.0
+        symbol_state["sl"] = 0.0
+        symbol_state["tp"] = 0.0
+
+        symbol_state["entry_time"] = None
+        symbol_state["entry_timeframe"] = None
+        symbol_state["active_tf"] = None
+
+        symbol_state["pos_btc"] = 0.0
+        symbol_state["pos_usd"] = 0.0
+
+        symbol_state["initial_pos_btc"] = 0.0
+        symbol_state["initial_pos_usd"] = 0.0
+
+        symbol_state["active_targets"] = []
+        symbol_state["remaining_percent"] = 100.0
+
+        symbol_state["trade_pnl"] = 0.0
+
+        symbol_state["breakeven_active"] = False
+
     # MARKET
     state["symbol"] = CONFIG["default_symbol"]
     state["direction"] = CONFIG["default_direction"]
@@ -241,6 +365,32 @@ def reset_trade_state():
 def factory_reset_state():
 
     reset_trade_state()
+
+    # =========================
+    # V5 RANGE RESET
+    # =========================
+
+    for symbol_state in state["symbols"].values():
+
+        symbol_state["high"] = None
+        symbol_state["low"] = None
+
+        symbol_state["range_set_time"] = 0
+
+        symbol_state["structure_active"] = False
+        symbol_state["range_invalid"] = False
+
+        symbol_state["long_zone_used"] = {
+            "A": False,
+            "B": False,
+            "C": False
+        }
+
+        symbol_state["short_zone_used"] = {
+            "A": False,
+            "B": False,
+            "C": False
+        }
 
     state["balance"] = CONFIG["paper_balance"]
     state["risk"] = 1.0

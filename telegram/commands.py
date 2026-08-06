@@ -2,13 +2,188 @@ from state import (
     state,
     save_state,
     reset_trade_state,
-    factory_reset_state
+    factory_reset_state,
+    create_symbol_state
 )
 from strategy.zones import get_zones
 
 import time
 
 print("TG STATE ID:", id(state))
+
+def format_price(price, symbol_state):
+
+    precision = symbol_state.get("price_precision", 2)
+
+    return f"{price:.{precision}f}"
+    
+# =====================================================
+# SET ACTIVE SYMBOL
+# =====================================================
+def set_active_symbol(symbol):
+
+    symbol = symbol.upper()
+
+    state["active_symbol"] = symbol
+
+
+# =====================================================
+# SET ACTIVE SYMBOL
+# =====================================================
+def set_active_symbol(symbol):
+
+    symbol = symbol.upper()
+
+    state["active_symbol"] = symbol
+
+    if symbol not in state["symbols"]:
+        state["symbols"][symbol] = create_symbol_state()
+
+    state["symbols"][symbol]["symbol"] = symbol
+
+    save_state(state)
+
+    return f"📈 Active Symbol: {symbol}"
+
+# =====================================================
+# STATUS DASHBOARD
+# =====================================================
+
+def build_status():
+
+    msg = "📊 CRYPTO FIBO BOT V5\n\n"
+
+    msg += "════════ ACTIVE SYMBOLS ════════\n\n"
+
+    inactive = []
+
+    for symbol, s in state["symbols"].items():
+
+        active_range = (
+            s["structure_active"]
+            and not s["range_invalid"]
+        )
+
+        active_trade = s["trade_active"]
+
+        # ------------------------------------
+        # INACTIVE LIST
+        # ------------------------------------
+
+        if not active_range and not active_trade:
+
+            if s["range_invalid"]:
+                inactive.append(f"🔴 {symbol}   Range Invalid")
+            else:
+                inactive.append(f"⚫ {symbol}   No Range")
+
+            continue
+
+        # ------------------------------------
+        # HEADER
+        # ------------------------------------
+
+        icon = "🟢" if active_trade else "🟡"
+
+        msg += f"{icon} {symbol}\n\n"
+
+        msg += (
+            f"Direction   : {s['direction'].upper()}\n"
+            f"Range       : ACTIVE ✅\n"
+            f"High        : {format_price(s['high'], s)}\n"
+            f"Low         : {format_price(s['low'], s)}\n"
+            f"TF          : {', '.join(s['timeframes'])}\n\n"
+        )
+
+        # ------------------------------------
+        # TRADE
+        # ------------------------------------
+
+        if active_trade:
+
+            asset = symbol.replace("USDT", "")
+
+            msg += (
+                f"Trade       : ACTIVE {s['trade_side'].upper()}\n"
+                f"Entry       : {format_price(s['entry'], s)}\n"
+                f"SL          : {format_price(s['sl'], s)}\n"
+                f"Remaining   : {round(s['remaining_percent'], 2)}%\n"
+                f"Trade PnL   : {round(s['trade_pnl'], 2)} USD\n\n"
+            )
+
+            msg += (
+                f"Position\n"
+                f"{asset:<12}: {round(s['pos_btc'], 6)}\n"
+                f"USD         : {round(s['pos_usd'], 2)}\n\n"
+            )
+
+        else:
+
+            msg += "Trade       : NONE\n\n"
+
+        # ------------------------------------
+        # TAKE PROFIT
+        # ------------------------------------
+
+        msg += "Take Profit\n\n"
+
+        if len(s["active_targets"]) > 0:
+
+            for i, tp in enumerate(s["active_targets"], start=1):
+
+                icon = "✅" if tp["hit"] else "⏳"
+
+                msg += (
+                    f"{icon} TP{i}  {tp['value']}   "
+                    f"{tp['percent']}%\n"
+                )
+
+        else:
+
+            for i, tp in enumerate(s["tp_config"], start=1):
+
+                msg += (
+                    f"⏳ TP{i}  {tp['value']}   "
+                    f"{tp['percent']}%\n"
+                )
+
+        msg += "\n"
+
+        msg += (
+            f"Break Even : {'ON' if s['breakeven_active'] else 'OFF'}\n"
+        )
+
+        msg += "\n──────────────────────────────\n\n"
+
+    # ------------------------------------
+    # INACTIVE SYMBOLS
+    # ------------------------------------
+
+    if inactive:
+
+        msg += "════════ INACTIVE ════════\n\n"
+
+        for item in inactive:
+
+            msg += item + "\n"
+
+        msg += "\n"
+
+    # ------------------------------------
+    # ACCOUNT
+    # ------------------------------------
+
+    msg += "════════ ACCOUNT ════════\n\n"
+
+    msg += (
+        f"Running : {'YES ✅' if state['running'] else 'NO 🔴'}\n\n"
+        f"Balance : {round(state['balance'], 2)} USD\n\n"
+        f"Wins    : {state['wins']}\n"
+        f"Losses  : {state['losses']}\n"
+        f"Trades  : {state['total_trades']}\n"
+    )
+
+    return msg
 
 def handle_command(text: str):
 
@@ -20,28 +195,37 @@ def handle_command(text: str):
     if text == "/help":
 
         return """
-🤖 BTC FIBO BOT V4
+🤖 CRYPTO FIBO BOT V5
 
 ══════════ BOT ══════════
 
 /start
 /stop
 /status
+/help
 
 ════════ SYMBOL ════════
 
-/btc
-/eth
-/sol
-/xrp
+/add BTCUSDT
+/remove BTCUSDT
+
 /symbol BTCUSDT
 
-═══════ DIRECTION ═══════
+Dynamic Symbol Commands
+
+/btc
+/eth
+/bnb
+/bico
+/doge
+...
+
+════════ DIRECTION ════════
 
 /long
 /short
 
-═══════ TIMEFRAME ═══════
+════════ TIMEFRAME ════════
 
 /tf 1m
 /tf 5m
@@ -52,14 +236,14 @@ def handle_command(text: str):
 /tf 5m 15m
 /tf 15m 1h
 
-════════ RANGE ═════════
+════════ RANGE ══════════
 
 /range HIGH LOW
 
 Example:
 /range 60961 58205
 
-═════════ RISK ═════════
+════════ RISK ═══════════
 
 /risk 1
 
@@ -72,20 +256,21 @@ Example:
 /tp remove <index>
 
 Examples:
+
 /tp add 1.0 30
 /tp add 1.272 30
 /tp add 1.618 40
 
-════════ BREAK EVEN ════════
+════════ BREAK EVEN ══════
 
 /be on
 /be off
 
-═════════ INFO ═════════
+════════ INFO ═══════════
 
 /zones
 
-════════ RESET ═════════
+════════ RESET ══════════
 
 /reset_trade
 /factory_reset
@@ -108,36 +293,19 @@ Examples:
         return "⛔ Bot Stopped"
 
     # =====================================================
-    # BTC
+    # DYNAMIC SYMBOL COMMAND
     # =====================================================
-    if text == "/btc":
-        state["symbol"] = "BTCUSDT"
-        save_state(state)
-        return "📈 Symbol: BTCUSDT"
+    if text.startswith("/"):
 
-    # =====================================================
-    # ETH
-    # =====================================================
-    if text == "/eth":
-        state["symbol"] = "ETHUSDT"
-        save_state(state)
-        return "📈 Symbol: ETHUSDT"
+        command = text[1:].upper()
 
-    # =====================================================
-    # SOL
-    # =====================================================
-    if text == "/sol":
-        state["symbol"] = "SOLUSDT"
-        save_state(state)
-        return "📈 Symbol: SOLUSDT"
+        for symbol in state["symbols"]:
 
-    # =====================================================
-    # XRP
-    # =====================================================
-    if text == "/xrp":
-        state["symbol"] = "XRPUSDT"
-        save_state(state)
-        return "📈 Symbol: XRPUSDT"
+            base = symbol.replace("USDT", "")
+
+            if command == base:
+
+                return set_active_symbol(symbol)
 
     # =====================================================
     # CUSTOM SYMBOL
@@ -148,36 +316,89 @@ Examples:
 
             _, symbol = text.split()
 
-            state["symbol"] = symbol.upper()
-
-            save_state(state)
-
-            return f"📈 Symbol: {state['symbol']}"
+            return set_active_symbol(symbol)
 
         except:
             return "Usage:\n/symbol BTCUSDT"
+
+    # =====================================================
+    # ADD SYMBOL
+    # =====================================================
+    if text.startswith("/add"):
+
+        try:
+
+            _, symbol = text.split()
+
+            symbol = symbol.upper()
+
+            if symbol in state["symbols"]:
+                return f"⚠ {symbol} already exists."
+
+            state["symbols"][symbol] = create_symbol_state()
+            state["symbols"][symbol]["symbol"] = symbol
+
+            save_state(state)
+
+            return f"✅ Added: {symbol}"
+
+        except:
+            return "Usage:\n/add BTCUSDT"
+
+    # =====================================================
+    # REMOVE SYMBOL
+    # =====================================================
+    if text.startswith("/remove"):
+
+        try:
+
+            _, symbol = text.split()
+
+            symbol = symbol.upper()
+
+            if symbol not in state["symbols"]:
+                return f"❌ {symbol} not found."
+
+            if len(state["symbols"]) == 1:
+                return "❌ Cannot remove the last symbol."
+
+            del state["symbols"][symbol]
+
+            if state["active_symbol"] == symbol:
+                state["active_symbol"] = next(iter(state["symbols"]))
+
+            save_state(state)
+
+            return f"🗑 Removed: {symbol}"
+
+        except:
+            return "Usage:\n/remove BTCUSDT"
 
     # =====================================================
     # LONG
     # =====================================================
     if text == "/long":
 
-        state["direction"] = "long"
+        symbol = state["active_symbol"]
+
+        state["symbols"][symbol]["direction"] = "long"
 
         save_state(state)
 
-        return "🟢 Direction: LONG"
+        return f"🟢 {symbol}\nDirection: LONG"
 
     # =====================================================
     # SHORT
     # =====================================================
     if text == "/short":
 
-        state["direction"] = "short"
+        symbol = state["active_symbol"]
+
+        state["symbols"][symbol]["direction"] = "short"
 
         save_state(state)
 
-        return "🔴 Direction: SHORT"
+        return f"🔴 {symbol}\nDirection: SHORT"
 
    
     # =====================================================
@@ -192,12 +413,16 @@ Examples:
             if len(tfs) == 0:
                 return "Usage: /tf 5m 15m"
 
-            state["timeframes"] = tfs
+            symbol = state["active_symbol"]
+
+            state["symbols"][symbol]["timeframes"] = tfs
 
             save_state(state)
 
-            return f"⏱ Timeframes set: {state['timeframes']}"
-
+            return (
+                f"⏱ {symbol}\n"
+                f"Timeframes: {state['symbols'][symbol]['timeframes']}"
+            )
         except:
             return "Usage: /tf 5m 15m"
 
@@ -207,46 +432,56 @@ Examples:
     # =====================================================
     if text.startswith("/range"):
 
-        print("🔥 RANGE COMMAND:", text)
-
         try:
             _, high, low = text.split()
 
-            state["high"] = float(high)
-            state["low"] = float(low)
+            symbol = state["active_symbol"]
+
+            print("\n🔥 RANGE SET")
+            print(f"Symbol     : {symbol}")
+
+            state["symbols"][symbol]["high"] = float(high)
+            state["symbols"][symbol]["low"] = float(low)
+
+            # Ár pontosság eltárolása
+            precision = 0
+
+            if "." in high:
+                precision = len(high.split(".")[1])
+
+            state["symbols"][symbol]["price_precision"] = precision
 
             # Mikor lett beállítva a range?
-            state["range_set_time"] = int(time.time() * 1000)
+            state["symbols"][symbol]["range_set_time"] = int(time.time() * 1000)
 
-            state["structure_active"] = True
-            state["range_invalid"] = False
+            state["symbols"][symbol]["structure_active"] = True
+            state["symbols"][symbol]["range_invalid"] = False
 
             # Új range → minden zóna újra használható
-            state["long_zone_used"] = {
+            state["symbols"][symbol]["long_zone_used"] = {
                 "A": False,
                 "B": False,
                 "C": False
             }
 
-            state["short_zone_used"] = {
+            state["symbols"][symbol]["short_zone_used"] = {
                 "A": False,
                 "B": False,
                 "C": False
             }
 
-            print("STATE HIGH:", state["high"])
-            print("STATE LOW :", state["low"])
+            print(f"High       : {state['symbols'][symbol]['high']}")
+            print(f"Low        : {state['symbols'][symbol]['low']}")
 
             save_state(state)
 
-            import inspect
-
-            print(save_state)
-            print(inspect.getsourcefile(save_state))
-
             print("💾 STATE SAVED")
 
-            return f"📊 Range set\nHigh: {high}\nLow: {low}"
+            return (
+                f"📊 Range set for {symbol}\n"
+                f"High: {high}\n"
+                f"Low: {low}"
+            )
 
         except Exception as e:
             print("❌ RANGE ERROR:", e)
@@ -298,11 +533,16 @@ Examples:
     # =====================================================
     if text == "/zones":
 
-        if state["high"] is None or state["low"] is None:
+        symbol = state["active_symbol"]
+        symbol_state = state["symbols"][symbol]
+
+        if symbol_state["high"] is None or symbol_state["low"] is None:
             return "⚠ No range set"
 
-        zones = get_zones(state["high"], state["low"])
-
+        zones = get_zones(
+            symbol_state["high"],
+            symbol_state["low"]
+        )
         msg = "📐 FIBO ZONES\n\n"
 
         msg += "🟩 LONG\n"
@@ -320,14 +560,17 @@ Examples:
     # =====================================================
     if text == "/tp":
 
-        if len(state["tp_config"]) == 0:
+        symbol = state["active_symbol"]
+        symbol_state = state["symbols"][symbol]
+
+        if len(symbol_state["tp_config"]) == 0:
             return "⚠ No TP configured."
 
-        msg = "📌 TP CONFIGURATION\n\n"
+        msg = f"📌 TP CONFIGURATION ({symbol})\n\n"
 
         total = 0
 
-        for i, tp in enumerate(state["tp_config"], start=1):
+        for i, tp in enumerate(symbol_state["tp_config"], start=1):
 
             msg += (
                 f"{i}. "
@@ -346,18 +589,24 @@ Examples:
     # =====================================================
     if text == "/tp clear":
 
-        state["tp_config"] = []
+        symbol = state["active_symbol"]
+        symbol_state = state["symbols"][symbol]
+
+        symbol_state["tp_config"] = []
 
         save_state(state)
 
-        return "🗑 TP configuration cleared."
+        return f"🗑 TP configuration cleared for {symbol}."
 
     # =====================================================
     # TP RESET
     # =====================================================
     if text == "/tp reset":
 
-        state["tp_config"] = [
+        symbol = state["active_symbol"]
+        symbol_state = state["symbols"][symbol]
+
+        symbol_state["tp_config"] = [
             {
                 "type": "fibo",
                 "value": 1.0,
@@ -367,7 +616,7 @@ Examples:
 
         save_state(state)
 
-        return "♻ TP configuration reset."
+        return f"♻ TP configuration reset for {symbol}."
 
     # =====================================================
     # TP ADD
@@ -376,23 +625,26 @@ Examples:
 
         try:
 
+            symbol = state["active_symbol"]
+            symbol_state = state["symbols"][symbol]
+
             _, _, level, percent = text.split()
 
             level = float(level)
             percent = float(percent)
 
-            if level < 1.0:
-                return "❌ Fibonacci level must be >= 1.0"
+            if level < 0.5:
+                return "❌ Fibonacci level must be >= 0.5"
 
             if percent <= 0:
                 return "❌ Percent must be greater than 0"
 
-            total = sum(tp["percent"] for tp in state["tp_config"])
+            total = sum(tp["percent"] for tp in symbol_state["tp_config"])
 
             if total + percent > 100:
                 return "❌ Total TP percentage cannot exceed 100%"
 
-            state["tp_config"].append(
+            symbol_state["tp_config"].append(
                 {
                     "type": "fibo",
                     "value": level,
@@ -403,7 +655,7 @@ Examples:
             save_state(state)
 
             return (
-                f"✅ TP added\n\n"
+                f"✅ TP added for {symbol}\n\n"
                 f"Level: {level}\n"
                 f"Percent: {percent}%"
             )
@@ -418,19 +670,22 @@ Examples:
 
         try:
 
+            symbol = state["active_symbol"]
+            symbol_state = state["symbols"][symbol]
+
             _, _, index = text.split()
 
             index = int(index) - 1
 
-            if index < 0 or index >= len(state["tp_config"]):
+            if index < 0 or index >= len(symbol_state["tp_config"]):
                 return "❌ Invalid TP index"
 
-            removed = state["tp_config"].pop(index)
+            removed = symbol_state["tp_config"].pop(index)
 
             save_state(state)
 
             return (
-                f"🗑 TP removed\n\n"
+                f"🗑 TP removed from {symbol}\n\n"
                 f"Level: {removed['value']}\n"
                 f"Percent: {removed['percent']}%"
             )
@@ -443,84 +698,33 @@ Examples:
     # =====================================================
     if text == "/be on":
 
-        state["breakeven_enabled"] = True
+        symbol = state["active_symbol"]
+        symbol_state = state["symbols"][symbol]
+
+        symbol_state["breakeven_enabled"] = True
 
         save_state(state)
 
-        return "🟢 Break Even enabled"
+        return f"🟢 {symbol}\nBreak Even enabled"
 
     # =====================================================
     # BREAK EVEN OFF
     # =====================================================
     if text == "/be off":
 
-        state["breakeven_enabled"] = False
+        symbol = state["active_symbol"]
+        symbol_state = state["symbols"][symbol]
+
+        symbol_state["breakeven_enabled"] = False
 
         save_state(state)
 
-        return "🔴 Break Even disabled"
+        return f"🔴 {symbol}\nBreak Even disabled"
 
     # =====================================================
     # STATUS
     # =====================================================
     if text == "/status":
-
-        tp_text = ""
-
-        if len(state["tp_config"]) == 0:
-
-            tp_text = "None"
-
-        else:
-
-            for i, tp in enumerate(state["tp_config"], start=1):
-
-                tp_text += (
-                    f"{i}. Fibo {tp['value']} → "
-                    f"{tp['percent']}%\n"
-                )
-
-        return f"""
-📊 BTC FIBO BOT STATUS
-
-════════ BOT ════════
-
-Running: {state["running"]}
-
-════════ MARKET ════════
-
-Symbol: {state["symbol"]}
-Direction: {state["direction"]}
-Timeframes: {state["timeframes"]}
-
-════════ RANGE ════════
-
-High: {state["high"]}
-Low : {state["low"]}
-
-════════ RISK ════════
-
-Risk: {state["risk"]}%
-
-════════ TRADE ════════
-
-Active: {state["trade_active"]}
-Side: {state["trade_side"]}
-
-════════ TAKE PROFIT ════════
-
-{tp_text}
-
-Break Even: {"ON" if state["breakeven_enabled"] else "OFF"}
-
-════════ ACCOUNT ════════
-
-Balance: {round(state["balance"],2)}
-
-Wins: {state["wins"]}
-Losses: {state["losses"]}
-Trades: {state["total_trades"]}
-"""
-
+        return build_status()
 
     return "❓ Unknown command (/help)" 

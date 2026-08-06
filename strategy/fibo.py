@@ -118,7 +118,7 @@ def calculate_extension_price(side, high, low, level):
     except (TypeError, ValueError):
         return None
 
-    if level < 1.0:
+    if level < 0.5:
         return None
 
     if side == "long":

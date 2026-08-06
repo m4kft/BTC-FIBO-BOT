@@ -4,16 +4,16 @@ from execution.paper import close_trade
 from telegram.bot import send_close, send_tp_hit
 
 
-def check_trade_exit(candle):
+def check_trade_exit(symbol_state, candle):
 
-    if not state["trade_active"]:
+    if not symbol_state["trade_active"]:
         return False
 
-    side = state["trade_side"]
-    entry = state["entry"]
-    sl = state["sl"]
-    active_targets = state.get("active_targets", [])
-    pos_btc = state["pos_btc"]
+    side = symbol_state["trade_side"]
+    entry = symbol_state["entry"]
+    sl = symbol_state["sl"]
+    active_targets = symbol_state.get("active_targets", [])
+    pos_btc = symbol_state["pos_btc"]
 
     high = candle["high"]
     low = candle["low"]
@@ -53,7 +53,7 @@ def check_trade_exit(candle):
 
         if low <= sl:
 
-            if state["breakeven_active"] and sl == entry:
+            if symbol_state["breakeven_active"] and sl == entry:
                 result = "BE"
             else:
                 result = "LOSS"
@@ -64,13 +64,12 @@ def check_trade_exit(candle):
 
         if high >= sl:
 
-            if state["breakeven_active"] and sl == entry:
+            if symbol_state["breakeven_active"] and sl == entry:
                 result = "BE"
             else:
                 result = "LOSS"
 
             exit_price = sl
-
 
     # =========================
     # TP FOUND
@@ -78,12 +77,10 @@ def check_trade_exit(candle):
 
     if tp_hit is not None:
 
-
         result = "WIN"
 
     if result is None:
         return False
-
     # =========================
     # PARTIAL TP
     # =========================
@@ -93,12 +90,12 @@ def check_trade_exit(candle):
         close_percent = tp_hit["percent"] / 100.0
 
         close_btc = (
-            state["initial_pos_btc"]
+            symbol_state["initial_pos_btc"]
             * close_percent
         )
 
         close_usd = (
-            state["initial_pos_usd"]
+            symbol_state["initial_pos_usd"]
             * close_percent
         )
 
@@ -110,76 +107,75 @@ def check_trade_exit(candle):
         )
 
         state["balance"] += pnl
-        state["trade_pnl"] += pnl
+        symbol_state["trade_pnl"] += pnl
 
-        state["pos_btc"] -= close_btc
-        state["pos_usd"] -= close_usd
+        symbol_state["pos_btc"] -= close_btc
+        symbol_state["pos_usd"] -= close_usd
 
         # Lebegőpontos védelem
-        if state["pos_btc"] < 0:
-            state["pos_btc"] = 0
+        if symbol_state["pos_btc"] < 0:
+            symbol_state["pos_btc"] = 0
 
-        if state["pos_usd"] < 0:
-            state["pos_usd"] = 0
+        if symbol_state["pos_usd"] < 0:
+            symbol_state["pos_usd"] = 0
 
-        state["remaining_percent"] -= tp_hit["percent"]
+        symbol_state["remaining_percent"] -= tp_hit["percent"]
 
         tp_hit["hit"] = True
 
         tp_number = (
-            state["active_targets"].index(tp_hit) + 1
+            symbol_state["active_targets"].index(tp_hit) + 1
         )
 
         # Ne menjen negatívba lebegőpontos hiba miatt
-        if state["remaining_percent"] < 0:
-            state["remaining_percent"] = 0
+        if symbol_state["remaining_percent"] < 0:
+            symbol_state["remaining_percent"] = 0
 
-        print(
-            f"🎯 TP HIT {tp_hit['value']} | "
-            f"{tp_hit['percent']}% CLOSED"
-        )
+        asset = symbol_state["symbol"].replace("USDT", "")
 
+        print("\n🎯 TAKE PROFIT HIT")
+        print(f"Symbol       : {symbol_state['symbol']}")
+        print(f"TP           : TP{tp_number}")
+        print(f"Fibo         : {tp_hit['value']}")
+        print(f"Closed       : {tp_hit['percent']}%")
+        print(f"Remaining    : {symbol_state['remaining_percent']}%")
+        print(f"Trade PnL    : {round(symbol_state['trade_pnl'], 2)} USD")
 
         # =========================
         # BREAK EVEN
         # =========================
 
         if (
-            state["breakeven_enabled"]
-            and not state["breakeven_active"]
-            and state["remaining_percent"] > 0
+            symbol_state["breakeven_enabled"]
+            and not symbol_state["breakeven_active"]
+            and symbol_state["remaining_percent"] > 0
         ):
 
-            state["sl"] = state["entry"]
-            state["breakeven_active"] = True
+            symbol_state["sl"] = symbol_state["entry"]
+            symbol_state["breakeven_active"] = True
 
-            print("🟢 BREAK EVEN ACTIVATED")
+            print("Break Even   : ON")
 
         send_tp_hit(
-
+            symbol_state,
             tp_number,
-
             tp_hit,
-
-            state["remaining_percent"],
-
-            state["trade_pnl"],
-
-            state["breakeven_active"]
-
+            symbol_state["remaining_percent"],
+            symbol_state["trade_pnl"],
+            symbol_state["breakeven_active"]
         )
 
         # Ha ez volt az utolsó TP,
         # a maradék pozíció már 0.
-        if state["remaining_percent"] <= 0:
+        if symbol_state["remaining_percent"] <= 0:
             pass
 
         # Ha ez nem az utolsó TP, akkor marad nyitva a trade
-        if state["remaining_percent"] > 0:
+        if symbol_state["remaining_percent"] > 0:
 
             # Trade továbbra is aktív.
             # Nem kereshet új belépőt.
-            state["trade_active"] = True
+            symbol_state["trade_active"] = True
 
             save_state(state)
 
@@ -189,17 +185,12 @@ def check_trade_exit(candle):
             # mielőtt a végleges lezárás lefut.
             save_state(state)
 
-        if state["remaining_percent"] > 0:
+        if symbol_state["remaining_percent"] > 0:
 
-            print(
-                f"📦 Remaining position: {state['remaining_percent']}%"
-            )
-
-            print("⏳ Trade remains active.")
+            print("Trade Status : ACTIVE")
 
             return False
-            
-    # =========================
+     # =========================
     # FINAL CLOSE
     # =========================
 
@@ -210,18 +201,18 @@ def check_trade_exit(candle):
         pnl = calculate_pnl(
             entry,
             exit_price,
-            state["pos_btc"],
+            symbol_state["pos_btc"],
             side
         )
 
         state["balance"] += pnl
-        state["trade_pnl"] += pnl
+        symbol_state["trade_pnl"] += pnl
 
-    elif result == "WIN" and state["remaining_percent"] <= 0:
+    elif result == "WIN" and symbol_state["remaining_percent"] <= 0:
 
-         # Az utolsó TP PnL-je már a PARTIAL TP
-         # blokkban elszámolásra került.
-         pnl = 0
+        # Az utolsó TP PnL-je már a PARTIAL TP
+        # blokkban elszámolásra került.
+        pnl = 0
 
     # =========================
     # STATS
@@ -235,7 +226,7 @@ def check_trade_exit(candle):
 
     elif result == "LOSS":
 
-        loss_part = state["remaining_percent"] / 100.0
+        loss_part = symbol_state["remaining_percent"] / 100.0
 
         state["losses"] += loss_part
 
@@ -247,34 +238,35 @@ def check_trade_exit(candle):
     # FINAL TRADE CLOSE
     # =========================
 
-    if state["remaining_percent"] <= 0 or result in ("LOSS", "BE"):
+    if symbol_state["remaining_percent"] <= 0 or result in ("LOSS", "BE"):
 
         state["total_trades"] += 1
 
         send_close(
+            symbol_state,
             result,
-            state["trade_pnl"],
-            state.get("active_tf")
+            symbol_state["trade_pnl"],
+            symbol_state.get("active_tf")
         )
 
         print(f"📉 TRADE CLOSED | {result}")
 
-        close_trade(result)
+        close_trade(symbol_state, result)
 
-        state["trade_active"] = False
-        state["trade_side"] = None
-        state["entry"] = 0
-        state["sl"] = 0
-        state["tp"] = 0
-        state["pos_btc"] = 0
-        state["pos_usd"] = 0
-        state["initial_pos_btc"] = 0
-        state["initial_pos_usd"] = 0
-        state["remaining_percent"] = 0
-        state["trade_pnl"] = 0.0
-        state["breakeven_active"] = False
-        state["entry_time"] = None
-        state["entry_candle_close"] = None
+        symbol_state["trade_active"] = False
+        symbol_state["trade_side"] = None
+        symbol_state["entry"] = 0
+        symbol_state["sl"] = 0
+        symbol_state["tp"] = 0
+        symbol_state["pos_btc"] = 0
+        symbol_state["pos_usd"] = 0
+        symbol_state["initial_pos_btc"] = 0
+        symbol_state["initial_pos_usd"] = 0
+        symbol_state["remaining_percent"] = 0
+        symbol_state["trade_pnl"] = 0.0
+        symbol_state["breakeven_active"] = False
+        symbol_state["entry_time"] = None
+        symbol_state["entry_candle_close"] = None
 
         save_state(state)
 

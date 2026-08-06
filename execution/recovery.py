@@ -3,73 +3,88 @@ from data.candles import get_candles_since
 from execution.trade_exit import check_trade_exit
 from telegram.bot import send_message
 
+
 def recover_trade():
 
     print("🔄 Offline Recovery...")
 
-    if not state["trade_active"]:
-        print("✅ No active trade.")
-        return
+    for symbol, symbol_state in state["symbols"].items():
 
-    print("📌 Active trade found.")
+        if not symbol_state["trade_active"]:
+            continue
 
-    if state.get("entry_candle_close") is None:
-        print("⚠ No entry_candle_close found.")
-        return
+        print(f"📌 Active trade found: {symbol}")
 
-    candles = get_candles_since(
-        interval=state["active_tf"],
-        start_time=state["entry_candle_close"]
-    )
+        if symbol_state.get("entry_candle_close") is None:
+            print(f"⚠ {symbol}: No entry_candle_close found.")
+            continue
 
-    print(f"📊 Missed candles: {len(candles)}")
+        candles = get_candles_since(
+            symbol=symbol,
+            interval=symbol_state["active_tf"],
+            start_time=symbol_state["entry_candle_close"]
+        )
 
-    for candle in candles:
-       
-        if check_trade_exit(candle):
+        print(f"📊 {symbol} | Missed candles: {len(candles)}")
 
-            print("✅ Offline trade recovered.")
-            break
+        for candle in candles:
 
-    if state["trade_active"]:
-        print("ℹ️ Trade still active after recovery.")
+            if check_trade_exit(symbol_state, candle):
+
+                print(f"✅ {symbol} | Offline trade recovered.")
+                break
+
+        if symbol_state["trade_active"]:
+            print(f"ℹ️ {symbol} | Trade still active after recovery.")
 
 
 def recover_range():
 
     print("🔍 Offline Range Recovery...")
 
-    if not state["structure_active"]:
-        print("ℹ️ No active range.")
-        return
+    for symbol, symbol_state in state["symbols"].items():
 
-    if state.get("range_set_time") is None or state["range_set_time"] == 0:
-        print("⚠ No range_set_time found.")
-        return
+        if not symbol_state["structure_active"]:
+            continue
 
-    candles = get_candles_since(
-        interval="5m",
-        start_time=state["range_set_time"]
-    )
+        if (
+            symbol_state.get("range_set_time") is None
+            or symbol_state["range_set_time"] == 0
+        ):
+            print(f"⚠ {symbol}: No range_set_time found.")
+            continue
 
-    print(f"📊 Checking {len(candles)} candles...")
+        candles = get_candles_since(
+            symbol=symbol,
+            interval="5m",
+            start_time=symbol_state["range_set_time"]
+        )
 
-    for candle in candles:
+        print(f"📊 {symbol} | Checking {len(candles)} candles...")
 
-        if candle["high"] > state["high"] or candle["low"] < state["low"]:
+        for candle in candles:
 
-            print("❌ Range was broken while bot was offline!")
+            if (
+                candle["high"] > symbol_state["high"]
+                or candle["low"] < symbol_state["low"]
+            ):
 
-            state["structure_active"] = False
-            state["range_invalid"] = True
+                print(f"❌ {symbol} | Range was broken while bot was offline!")
 
-            save_state(state)
+                symbol_state["structure_active"] = False
+                symbol_state["range_invalid"] = True
 
-            try:
-                send_message("❌ RANGE INVALID (Offline Recovery)")
-            except:
-                pass
+                save_state(state)
 
-            return
+                try:
+                    send_message(
+                        f"❌ {symbol}\n"
+                        "Range invalid (Offline Recovery)"
+                    )
+                except:
+                    pass
 
-    print("✅ Range still valid.")
+                break
+
+        else:
+            print(f"✅ {symbol} | Range still valid.")
