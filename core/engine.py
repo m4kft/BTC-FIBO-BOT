@@ -73,14 +73,6 @@ def run_engine():
                     prev = candle_data["previous"]
                     live = candle_data["live"]
 
-                    # Mindig ellenőrizzük az exitet
-                    if symbol_state["trade_active"]:
-                        check_trade_exit(symbol_state, live)
-
-                    # Ha a trade még mindig aktív,
-                    # nem keresünk új belépőt.
-                    if symbol_state["trade_active"]:
-                        continue
                         
                     # =========================
                     # RANGE INVALID CHECK
@@ -125,6 +117,13 @@ def run_engine():
                     # Ha a range érvénytelen, nem keresünk új belépőt
                     if symbol_state["range_invalid"]:
                         continue
+
+                    # =========================
+                    # TRADE EXIT
+                    # =========================
+
+                    if symbol_state["trade_active"]:
+                        check_trade_exit(symbol_state, live)
 
                     signal = get_signal(
                         candle=candle,

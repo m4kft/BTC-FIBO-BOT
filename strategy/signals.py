@@ -1,8 +1,8 @@
 from strategy.patterns import (
-    is_hammer,
-    is_shooting_star,
-    is_bullish_engulfing,
-    is_bearish_engulfing
+is_hammer,
+is_shooting_star,
+is_bullish_engulfing,
+is_bearish_engulfing
 )
 
 

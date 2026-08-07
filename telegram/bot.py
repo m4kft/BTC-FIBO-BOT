@@ -1,7 +1,7 @@
 from config import CONFIG
 from state import state
 import requests
-
+from utils.debug import debug
 
 TOKEN = CONFIG["telegram_token"]
 CHAT_ID = CONFIG["telegram_chat_id"]
@@ -28,6 +28,20 @@ def send_message(text: str):
 # =========================
 
 def send_entry(symbol_state, side, entry, sl, tp, zone, pattern, pos_btc, pos_usd, tf):
+
+    debug(
+        "ENTRY",
+        f"""
+    Symbol : {symbol_state["symbol"]}
+    TF     : {tf}
+    Side   : {side}
+    Zone   : {zone}
+    Pattern: {pattern}
+
+    Entry  : {format_price(entry, symbol_state)}
+    SL     : {format_price(sl, symbol_state)}
+    """
+    )
 
     symbol = symbol_state["symbol"]
     asset = symbol.replace("USDT", "")
