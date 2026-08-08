@@ -74,8 +74,20 @@ def check_trade_exit(symbol_state, candle):
     # =========================
     # TP FOUND
     # =========================
+    #
+    # FONTOS: ha ugyanazon a gyertyán/ellenőrzésen belül
+    # MIND a SL, MIND a TP szint teljesülne, OHLC adatból nem
+    # állapítható meg biztosan, hogy melyik történt előbb.
+    # Ezért itt konzervatívan a SL-t részesítjük előnyben
+    # (worst-case feltételezés), hogy a bot sose mutasson
+    # optimistább eredményt a valóságosnál.
+    #
+    # A régi kód itt feltétel nélkül felülírta a "LOSS"
+    # eredményt "WIN"-re, ha a TP is teljesült - ez hamisan
+    # javította a statisztikát minden olyan esetben, amikor
+    # egy gyertya mindkét szintet érintette.
 
-    if tp_hit is not None:
+    if result is None and tp_hit is not None:
 
         result = "WIN"
 
@@ -84,8 +96,12 @@ def check_trade_exit(symbol_state, candle):
     # =========================
     # PARTIAL TP
     # =========================
+    # Csak akkor foglalunk el részleges profitot, ha a TP
+    # valóban "megnyerte" a versenyt a SL-lel szemben
+    # (result == "WIN"). Ha a SL élvezett elsőbbséget, ne
+    # könyveljünk el semmilyen TP-részletet.
 
-    if tp_hit is not None:
+    if tp_hit is not None and result == "WIN":
 
         close_percent = tp_hit["percent"] / 100.0
 

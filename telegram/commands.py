@@ -3,7 +3,8 @@ from state import (
     save_state,
     reset_trade_state,
     factory_reset_state,
-    create_symbol_state
+    create_symbol_state,
+    normalize_symbol_input
 )
 from strategy.zones import get_zones
 
@@ -22,28 +23,21 @@ def format_price(price, symbol_state):
 # =====================================================
 def set_active_symbol(symbol):
 
-    symbol = symbol.upper()
+    clean_symbol, market = normalize_symbol_input(symbol)
 
-    state["active_symbol"] = symbol
+    state["active_symbol"] = clean_symbol
 
+    if clean_symbol not in state["symbols"]:
+        state["symbols"][clean_symbol] = create_symbol_state()
+        state["symbols"][clean_symbol]["market"] = market
 
-# =====================================================
-# SET ACTIVE SYMBOL
-# =====================================================
-def set_active_symbol(symbol):
-
-    symbol = symbol.upper()
-
-    state["active_symbol"] = symbol
-
-    if symbol not in state["symbols"]:
-        state["symbols"][symbol] = create_symbol_state()
-
-    state["symbols"][symbol]["symbol"] = symbol
+    state["symbols"][clean_symbol]["symbol"] = clean_symbol
 
     save_state(state)
 
-    return f"📈 Active Symbol: {symbol}"
+    market_label = state["symbols"][clean_symbol].get("market", "spot")
+
+    return f"📈 Active Symbol: {clean_symbol} ({market_label})"
 
 # =====================================================
 # STATUS DASHBOARD
@@ -207,9 +201,13 @@ def handle_command(text: str):
 ════════ SYMBOL ════════
 
 /add BTCUSDT
+/add GWEIUSDT.P   (.P = futures, auto-detect)
 /remove BTCUSDT
 
 /symbol BTCUSDT
+
+/market spot
+/market futures
 
 Dynamic Symbol Commands
 
@@ -330,20 +328,21 @@ Examples:
 
             _, symbol = text.split()
 
-            symbol = symbol.upper()
+            clean_symbol, market = normalize_symbol_input(symbol)
 
-            if symbol in state["symbols"]:
-                return f"⚠ {symbol} already exists."
+            if clean_symbol in state["symbols"]:
+                return f"⚠ {clean_symbol} already exists."
 
-            state["symbols"][symbol] = create_symbol_state()
-            state["symbols"][symbol]["symbol"] = symbol
+            state["symbols"][clean_symbol] = create_symbol_state()
+            state["symbols"][clean_symbol]["symbol"] = clean_symbol
+            state["symbols"][clean_symbol]["market"] = market
 
             save_state(state)
 
-            return f"✅ Added: {symbol}"
+            return f"✅ Added: {clean_symbol} ({market})"
 
         except:
-            return "Usage:\n/add BTCUSDT"
+            return "Usage:\n/add BTCUSDT\n/add GWEIUSDT.P  (auto-detects futures)"
 
     # =====================================================
     # REMOVE SYMBOL
@@ -401,6 +400,30 @@ Examples:
         return f"🔴 {symbol}\nDirection: SHORT"
 
    
+    # =====================================================
+    # MARKET (SPOT / FUTURES)
+    # =====================================================
+    if text.startswith("/market"):
+
+        try:
+            parts = text.split()
+            market = parts[1].lower()
+
+            if market not in ("spot", "futures"):
+                return "Usage:\n/market spot\n/market futures"
+
+            symbol = state["active_symbol"]
+
+            state["symbols"][symbol]["market"] = market
+
+            save_state(state)
+
+            return f"🏦 {symbol}\nMarket: {market}"
+
+        except:
+            return "Usage:\n/market spot\n/market futures"
+
+
     # =====================================================
     # TIMEFRAME
     # =====================================================

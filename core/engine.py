@@ -3,16 +3,15 @@ import time
 import traceback
 
 from config import CONFIG
-from state import state, load_state, save_state
+from state import state, save_state
 
-loaded = load_state()
-state.update(loaded)   # 🔥 EZ A HIÁNYZÓ LÉPÉS
-
-print("📦 STATE LOADED:", state)
-
-print("ENGINE STATE ID:", id(state))
+# MEGJEGYZÉS: a state betöltése (initialize_state()) most már
+# explicit módon, a main.py-ban történik, MIELŐTT ez a modul
+# bármit használna a state-ből. Ne tegyünk ide rejtett
+# import-mellékhatást - lásd a korábbi hibajavítás jegyzetét.
 
 from data.candles import get_candle
+from data.binance_ws import get_candle_ws
 from strategy.zones import get_zones
 from strategy.signals import get_signal
 from strategy.fibo import calculate_extension_price
@@ -68,7 +67,34 @@ def run_engine():
 
                 for tf in symbol_state["timeframes"]:
 
-                    candle_data = get_candle(symbol, tf)
+                    # =========================
+                    # CANDLE LEKÉRÉS - WS ELSŐDLEGES, REST FALLBACK
+                    # =========================
+                    # Elsőként a websocket cache-ből próbáljuk (gyors,
+                    # nem blokkol, nem hívja a hálózatot minden körben).
+                    # Ha még nincs rá adat (pl. most lett hozzáadva a
+                    # symbol) vagy elavult (STALE_SECONDS-nél régebbi),
+                    # visszaesünk a bevált REST hívásra - így ha a
+                    # websocket bármiért nem működne, a bot nem áll le,
+                    # csak a régi (lassabb, de működő) módon folytatja.
+                    #
+                    # Ha EZ a symbol/timeframe hibázik REST fallback
+                    # közben is, ne akadjon meg emiatt a TÖBBI symbol
+                    # vizsgálata is ugyanebben a körben - csak ezt a
+                    # timeframe-et hagyjuk ki, és megyünk tovább a
+                    # következőre.
+                    try:
+                        market = symbol_state.get("market", "spot")
+
+                        candle_data = get_candle_ws(symbol, tf, market)
+
+                        if candle_data is None:
+                            candle_data = get_candle(symbol, tf)
+
+                    except Exception as e:
+                        print(f"⚠ CANDLE FETCH ERROR ({symbol} {tf}): {e}")
+                        continue
+
                     candle = candle_data["current"]
                     prev = candle_data["previous"]
                     live = candle_data["live"]
@@ -108,7 +134,30 @@ def run_engine():
 
                     ts = candle["timestamp"]
 
+                    # =========================
+                    # TRADE EXIT
+                    # =========================
+                    # FONTOS: ennek FÜGGETLENNEK kell lennie a
+                    # range_invalid állapottól és a TF duplicate
+                    # lock-tól is - a "live" ár minden körben
+                    # változhat, a nyitott pozíció TP/SL/BE
+                    # ellenőrzése nem várhat egy új gyertyazárásra,
+                    # és pláne nem állhat le csak azért, mert a
+                    # range időközben érvénytelenné vált.
+                    #
+                    # (Korábban ez a blokk a range_invalid check
+                    # UTÁN futott - emiatt egy invalidálódott range
+                    # esetén a nyitott pozíció TP/SL ellenőrzése
+                    # teljesen leállt, és csak egy bot-újraindítás
+                    # (recovery.py) tudta pótolni utólag. Ez sértette
+                    # a "Range Invalid nem zár trade-et" szabályt.)
+
+                    if symbol_state["trade_active"]:
+                        check_trade_exit(symbol_state, live)
+
                     # TF duplicate lock
+                    # (ez mostantól csak az ÚJ BELÉPÉS keresésre
+                    # vonatkozik, az exit check-re nem)
                     if symbol_state["last_candle_ts"].get(tf) == ts:
                         continue
 
@@ -117,13 +166,6 @@ def run_engine():
                     # Ha a range érvénytelen, nem keresünk új belépőt
                     if symbol_state["range_invalid"]:
                         continue
-
-                    # =========================
-                    # TRADE EXIT
-                    # =========================
-
-                    if symbol_state["trade_active"]:
-                        check_trade_exit(symbol_state, live)
 
                     signal = get_signal(
                         candle=candle,

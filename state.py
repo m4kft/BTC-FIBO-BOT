@@ -5,6 +5,33 @@ import os
 STATE_FILE = "state.json"
 
 # =========================
+# SYMBOL INPUT NORMALIZÁLÁS
+# =========================
+def normalize_symbol_input(raw_symbol):
+    """
+    Bemeneti symbol string normalizálása.
+
+    Felismeri a TradingView-stílusú ".P" jelölést
+    (pl. "GWEIUSDT.P"), ami perpetual futures kontraktust
+    jelent - ilyenkor a ".P"-t levágjuk, és a piacot
+    "futures"-re állítjuk.
+
+    Enélkül (pl. "BTCUSDT") a piac "spot" marad - ez a
+    korábbi, megszokott viselkedés, visszafelé kompatibilis.
+
+    Visszatér: (clean_symbol, market)
+    market: "spot" vagy "futures"
+    """
+
+    raw = raw_symbol.strip().upper()
+
+    if raw.endswith(".P"):
+        return raw[:-2], "futures"
+
+    return raw, "spot"
+
+
+# =========================
 # SYMBOL TEMPLATE
 # =========================
 def create_symbol_state():
@@ -13,6 +40,7 @@ def create_symbol_state():
 
         # MARKET
         "symbol": CONFIG["default_symbol"],
+        "market": "spot",  # "spot" vagy "futures" - lásd normalize_symbol_input()
         "direction": CONFIG["default_direction"],
         "timeframes": CONFIG["default_timeframes"].copy(),
 
@@ -38,6 +66,7 @@ def create_symbol_state():
         "entry_time": None,
         "entry_timeframe": None,
         "active_tf": None,
+        "entry_candle_close": None,
 
         "pos_btc": 0.0,
         "pos_usd": 0.0,
@@ -224,6 +253,45 @@ def load_state():
 
     except:
         return {}
+
+# =========================
+# INITIALIZE STATE (EXPLICIT)
+# =========================
+def initialize_state():
+    """
+    Ezt kell meghívni induláskor, MIELŐTT bármi mást csinálunk
+    (engine indítás, recovery, stb.) - explicit, jól látható
+    módon tölti be a state.json-t, ahelyett hogy egy import
+    mellékhatásaként történne (ami törékeny: import sorrend
+    változtatásra elromlana).
+
+    Emellett minden symbol állapotot összefésül a
+    create_symbol_state() sablonnal, így ha a kód időközben
+    új mezőt vezetett be, a régi, mentett state.json-ban
+    hiányzó mezők automatikusan pótlódnak alapértelmezett
+    értékkel - nem lesz belőle KeyError.
+    """
+
+    loaded = load_state()
+
+    if not loaded:
+        print("📦 STATE: nincs korábbi mentés, alapértelmezett állapot marad.")
+        return state
+
+    state.update(loaded)
+
+    # Séma-migráció: minden symbolnál pótoljuk a hiányzó mezőket
+    template = create_symbol_state()
+
+    for symbol, symbol_state in state.get("symbols", {}).items():
+        for key, default_value in template.items():
+            if key not in symbol_state:
+                print(f"🔧 STATE MIGRATION: '{symbol}' - hiányzó mező pótolva: '{key}'")
+                symbol_state[key] = default_value
+
+    print("📦 STATE LOADED (initialize_state)")
+
+    return state
 
 # =========================
 # SAVE STATE (SAFE)

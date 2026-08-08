@@ -4,7 +4,29 @@ import requests
 import time
 from state import state
 
-BINANCE_URL = "https://api.binance.com/api/v3/klines"
+BINANCE_SPOT_URL = "https://api.binance.com/api/v3/klines"
+BINANCE_FUTURES_URL = "https://fapi.binance.com/fapi/v1/klines"
+
+
+def resolve_binance_url(symbol):
+    """
+    Symbolonként eldönti, hogy Spot vagy Futures (USDⓈ-M perpetual)
+    Binance végpontot kell-e hívni, a state.py-ban tárolt
+    "market" mező alapján (lásd normalize_symbol_input()).
+
+    Ha a symbol nem szerepel a state["symbols"]-ben (pl. egy
+    régi/külső hívás), alapértelmezésként "spot"-ot használunk -
+    ez a korábbi, megszokott viselkedés, visszafelé kompatibilis.
+    """
+
+    symbol_state = state.get("symbols", {}).get(symbol)
+
+    market = symbol_state.get("market", "spot") if symbol_state else "spot"
+
+    if market == "futures":
+        return BINANCE_FUTURES_URL
+
+    return BINANCE_SPOT_URL
 
 
 def get_candle(symbol=None, interval="5m", limit=3):
@@ -26,6 +48,8 @@ def get_candle(symbol=None, interval="5m", limit=3):
     if symbol is None:
         symbol = state["symbol"]
 
+    binance_url = resolve_binance_url(symbol)
+
     params = {
         "symbol": symbol,
         "interval": interval,
@@ -42,7 +66,7 @@ def get_candle(symbol=None, interval="5m", limit=3):
         try:
 
             response = requests.get(
-                BINANCE_URL,
+                binance_url,
                 params=params,
                 timeout=5
             )
@@ -59,7 +83,7 @@ def get_candle(symbol=None, interval="5m", limit=3):
 
             print(f"⚠ Binance request failed ({attempt + 1}/3): {e}")
 
-            time.sleep(2)
+            time.sleep(1)
 
     else:
         raise Exception(f"Binance request failed after 3 attempts: {last_error}")
@@ -111,6 +135,8 @@ def get_candles_since(symbol=None, interval="5m", start_time=None, limit=1000):
     if symbol is None:
         symbol = state["symbol"]
 
+    binance_url = resolve_binance_url(symbol)
+
     params = {
         "symbol": symbol,
         "interval": interval,
@@ -125,7 +151,7 @@ def get_candles_since(symbol=None, interval="5m", start_time=None, limit=1000):
         try:
 
             response = requests.get(
-                BINANCE_URL,
+                binance_url,
                 params=params,
                 timeout=5
             )
@@ -142,7 +168,7 @@ def get_candles_since(symbol=None, interval="5m", start_time=None, limit=1000):
 
             print(f"⚠ Binance request failed ({attempt + 1}/3): {e}")
 
-            time.sleep(2)
+            time.sleep(1)
 
     else:
         raise Exception(f"Binance request failed after 3 attempts: {last_error}")

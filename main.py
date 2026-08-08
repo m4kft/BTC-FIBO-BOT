@@ -1,7 +1,8 @@
-from state import state
+from state import state, initialize_state
 from core.engine import run_engine
 from telegram.runner import run_telegram_listener
 from execution.recovery import recover_trade, recover_range
+from data.binance_ws import start_websocket
 import threading
 
 
@@ -27,10 +28,28 @@ def setup_test_values():
 if __name__ == "__main__":
 
     # =========================
+    # STATE BETÖLTÉSE (EXPLICIT)
+    # =========================
+    # Ennek MINDIG az első lépésnek kell lennie - mielőtt
+    # bármelyik másik komponens (recovery, engine, telegram)
+    # hozzáférne a state-hez.
+    initialize_state()
+
+    # =========================
     # OFFLINE RECOVERY
     # =========================
     recover_trade()
     recover_range()
+
+    # =========================
+    # WEBSOCKET ADATRÉTEG
+    # =========================
+    # Nem blokkol - háttérszálakon fut. Ha bármiért nem sikerül
+    # kapcsolódnia (pl. hiányzik a websocket-client csomag, vagy
+    # hálózati probléma), az engine.py automatikusan REST
+    # fallback-re vált symbolonként/timeframe-enként, a bot nem
+    # áll le emiatt.
+    start_websocket()
 
     # =========================
     # ENGINE THREAD
